@@ -1,4 +1,4 @@
-package bc;
+package bc.Hash;
 
 public class Hash {
     private static final int ROUNDS = 8;               // NAUJA: buvo 4
