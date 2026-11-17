@@ -1,4 +1,4 @@
-﻿package bc;
+package bc;
 
 import bc.sim.Config;
 import bc.sim.Simulation;

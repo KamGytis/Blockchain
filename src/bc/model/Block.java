@@ -1,4 +1,4 @@
-﻿package bc.model;
+package bc.model;
 
 import java.util.List;
 

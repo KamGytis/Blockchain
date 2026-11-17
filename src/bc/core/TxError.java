@@ -1,4 +1,4 @@
-﻿package bc.core;
+package bc.core;
 
 public enum TxError {
     BAD_FORMAT("netinkamas lauku formatas", true),

@@ -1,4 +1,4 @@
-﻿package bc.core;
+package bc.core;
 
 import bc.model.Transaction;
 
@@ -43,7 +43,8 @@ public final class TxPool {
         return pending.isEmpty();
     }
 
-    void removeAll(Collection<Transaction> txs) {
+    /** Pašalina į priimtą bloką įtrauktas transakcijas. */
+    public void removeConfirmed(Collection<Transaction> txs) {
         for (Transaction tx : txs) pending.remove(tx.id());
     }
 

@@ -1,4 +1,4 @@
-﻿package bc.core;
+package bc.core;
 
 import bc.hash.HashUtil;
 import bc.model.Transaction;

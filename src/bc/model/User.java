@@ -1,4 +1,4 @@
-﻿package bc.model;
+package bc.model;
 
 /**
  * A simulated participant. {@code publicKey} is only a simulated public identifier
