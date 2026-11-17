@@ -3,10 +3,6 @@ package bc.core;
 import bc.hash.HashUtil;
 import bc.model.BlockHeader;
 
-/**
- * Darbo įrodymas: antraštės maišos hex užrašas turi prasidėti bent {@code difficulty} nuliais.
- * Tikrinimas visada iš naujo skaičiuoja maišą iš šešių antraštės laukų (išsaugotu hash nepasitikima).
- */
 public final class Pow {
     private Pow() {}
 
@@ -15,8 +11,6 @@ public final class Pow {
     public static boolean isValid(BlockHeader h) {
         return h.difficulty() >= 0 && HashUtil.hasLeadingZeros(h.hash(), h.difficulty());
     }
-
-    /** Nuosekliai didina nonce nuo template.nonce(); kiti antraštės laukai lieka fiksuoti. */
     public static Result mine(BlockHeader template) {
         if (template.difficulty() < 0 || template.difficulty() > HashUtil.HEX_LENGTH)
             throw new IllegalArgumentException("bad difficulty " + template.difficulty());

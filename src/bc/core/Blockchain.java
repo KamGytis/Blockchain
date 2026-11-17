@@ -11,10 +11,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * Vieno proceso grandinė. Pirmojo bloko prev_hash = 64 nuliai. Blokas priimamas tik jei praeina visus
- * patikrinimus; tada būsena pakeičiama atomiškai (dirbama su kopija).
- */
 public final class Blockchain {
     public static final int VERSION = 1;
 
@@ -70,7 +66,6 @@ public final class Blockchain {
     public List<Block> blocks() { return List.copyOf(blocks); }
     public boolean isConfirmed(String id) { return confirmed.contains(id); }
     public int confirmedCount() { return confirmed.size(); }
-    /** Dabartinė būsena (tik skaitymui; keičiama tik per addBlock). */
     public State state() { return state.copy(); }
     State liveState() { return state; }
     public Map<String, Long> initialBalances() { return initialBalances; }

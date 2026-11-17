@@ -9,22 +9,12 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 
-/** Surenka kandidatinį bloką iš fondo ir jį iškasa. */
+// Surenka kandidatinį bloką iš fondo ir jį iškasa.
 public final class Miner {
     private Miner() {}
 
     public record Mined(Block block, Pow.Result pow) {}
 
-    /**
-     * Parenka iki {@code blockSize} transakcijų. Kiekviena kandidatė tikrinama su darbine būsena, į kurią jau
-     * įskaičiuoti anksčiau į šį bloką parinkti mokėjimai, todėl vartotojas negali išleisti daugiau nei turi ir
-     * keliais mokėjimais tame pačiame bloke. Nepakankamo balanso transakcijos lieka fonde (laikina klaida),
-     * nuolatinių klaidų transakcijos atmetamos.
-     *
-     * @param rng jei ne null, fondo tvarka sumaišoma (atsitiktinė, bet nuo seed priklausoma atranka);
-     *            jei null, imama fondo (FIFO) tvarka
-     * @return null, jei fonde nėra nė vienos šiuo metu įvykdomos transakcijos
-     */
     public static List<Transaction> select(Blockchain chain, TxPool pool, int blockSize, Random rng) {
         List<Transaction> candidates = pool.pending();
         if (rng != null) Collections.shuffle(candidates, rng);

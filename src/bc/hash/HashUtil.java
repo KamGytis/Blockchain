@@ -2,7 +2,6 @@ package bc.hash;
 
 import java.nio.charset.StandardCharsets;
 
-/** Small helpers around {@link Hash}: UTF-8 hashing, hex validation and hex/byte conversion. */
 public final class HashUtil {
     public static final int HEX_LENGTH = 64;
     public static final String ZERO_HASH = "0".repeat(HEX_LENGTH);

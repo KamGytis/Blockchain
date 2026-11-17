@@ -2,7 +2,6 @@ package bc.core;
 
 import bc.model.Transaction;
 
-/** Transakcijos priėmimo į fondą taisyklės (struktūra + dublikatai). Balansas tikrinamas renkant bloką. */
 public final class Validator {
     private Validator() {}
 

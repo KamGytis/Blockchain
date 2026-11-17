@@ -1,9 +1,5 @@
 package bc.hash;
 
-/**
- * Savo maišos funkcija: 256 bitų (8 x 32 bitų žodžiai) išvestis, visada 64 mažosios hex raidės.
- * Versija žr. {@link #VERSION}; pakeitus algoritmą, VERSION ir README testų vektorius būtina atnaujinti.
- */
 public class Hash {
     public static final String VERSION = "KGHash v2 (8 raundai, message schedule, K konstantos, StrictMath)";
 
