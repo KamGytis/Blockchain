@@ -1,4 +1,4 @@
-﻿package bc.Hash;
+﻿package bc.hash;
 
 import java.nio.charset.StandardCharsets;
 
