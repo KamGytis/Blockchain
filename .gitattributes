@@ -1,0 +1,5 @@
+# .sh skriptai visada su LF (kitaip bash: "set: pipefail: invalid option name")
+*.sh text eol=lf
+*.bat text eol=crlf
+*.java text
+*.md text

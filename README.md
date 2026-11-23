@@ -7,6 +7,8 @@ Mokomoji vieno proceso blokų grandinė Java kalba: savo maišos funkcija, trans
 
 Reikia JDK 17 ar naujesnio (tikrinta su OpenJDK 21).
 
+Linux / macOS / Git Bash terminale:
+
 ```bash
 ./run.sh
 ```
@@ -15,7 +17,17 @@ Reikia JDK 17 ar naujesnio (tikrinta su OpenJDK 21).
 ./test.sh
 ```
 
-Be bash (pvz., Windows PowerShell / cmd):
+Windows PowerShell arba cmd (`./run.sh` čia neveikia – Windows `.sh` failą atidaro atskirame lange):
+
+```bash
+.\run.bat
+```
+
+```bash
+.\test.bat
+```
+
+Parinktys perduodamos taip pat, pvz. `.\run.bat --seed 7`. Rankiniu būdu:
 
 ```bash
 javac -encoding UTF-8 -d out/classes src/bc/*.java src/bc/core/*.java src/bc/hash/*.java src/bc/model/*.java src/bc/sim/*.java
@@ -24,6 +36,8 @@ javac -encoding UTF-8 -d out/classes src/bc/*.java src/bc/core/*.java src/bc/has
 ```bash
 java -cp out/classes bc.App
 ```
+
+`.gitattributes` užtikrina, kad `.sh` skriptai visada būtų su LF eilučių pabaigomis (su CRLF bash jų nepaleidžia).
 
 Parinktys (`java -cp out/classes bc.App --help`):
 
