@@ -1,7 +1,14 @@
-# Blockchain v0.1
+# Blockchain v0.2
 
-Mokomoji vieno proceso blokų grandinė Java kalba: savo maišos funkcija, transakcijų fondas, blokai su
-`tx_root`, darbo įrodymas (PoW) ir konsolės suvestinė. Išorinių bibliotekų nėra.
+Mokomoji vieno proceso blokų grandinė Java kalba: savo maišos funkcija, transakcijų fondas, Merkle medis,
+trijų etapų transakcijų ir blokų validacija, darbo įrodymas (PoW) ir penkių kandidatų konkurencija dėl kiekvieno
+bloko. Išorinių bibliotekų nėra.
+
+**v0.2 naujovės** (v0.1 eiga išlaikyta):
+* `tx_root` – Merkle medžio šaknis (bloko formato versija 2);
+* validacija išskirta į atskiras procedūras ir tris etapus: priėmimas į fondą, kandidato sudarymas, bloko priėmimas;
+* kiekvienam aukščiui – 5 kandidatai su ribotu bandymų / laiko biudžetu, dokumentuota laimėtojo taisyklė;
+* 40 testų, tarp jų Merkle, neigiami validavimo ir kandidatų testai.
 
 ## Paleidimas
 
@@ -27,7 +34,7 @@ Windows PowerShell arba cmd (`./run.sh` čia neveikia – Windows `.sh` failą a
 .\test.bat
 ```
 
-Parinktys perduodamos taip pat, pvz. `.\run.bat --seed 7`. Rankiniu būdu:
+Parinktys perduodamos taip pat, pvz. `.\run.bat --seed 7 --verbose`. Rankiniu būdu:
 
 ```bash
 javac -encoding UTF-8 -d out/classes src/bc/*.java src/bc/core/*.java src/bc/hash/*.java src/bc/model/*.java src/bc/sim/*.java
@@ -45,13 +52,18 @@ Parinktys (`java -cp out/classes bc.App --help`):
 |---|---|---|
 | `--users N` | 1000 | vartotojų skaičius |
 | `--txs N` | 10000 | sugeneruojamų transakcijų skaičius |
-| `--block-size N` | 100 | daugiausia transakcijų bloke |
+| `--block-size N` | 100 | daugiausia transakcijų bloke (grandinė tikrina šią ribą) |
 | `--difficulty N` | 3 | kiek pradinių `0` turi turėti bloko hash (hex) |
 | `--seed N` | 20261029 | generavimo seed |
 | `--max-amount N` | 50000 | didžiausia generuojama mokėjimo suma |
 | `--invalid-rate X` | 0.01 | tyčia sugadintų transakcijų dalis (atmetimo logikai parodyti) |
 | `--out DIR` | `out` | kur rašyti `initial_state.csv` ir `report.txt` |
-| `--fixed-time` | išjungta | `timestamp` = bloko aukštis, todėl visi bloko hash atkuriami |
+| `--fixed-time` | išjungta | `timestamp` = bloko aukštis, todėl visa grandinė atkuriama |
+| `--candidates N` | 5 | kandidatų kiekvienam aukščiui |
+| `--budget N` | 2000 | pradinis bandymų biudžetas kandidatui per raundą |
+| `--budget-ms N` | 5000 | laiko biudžetas kandidatui per raundą (ms) |
+| `--max-rounds N` | 10 | kiek raundų (biudžeto dvigubinimų) daugiausia, prieš sustabdant paiešką |
+| `--verbose` | išjungta | kiekvienam aukščiui spausdinti kiekvieno kandidato eilutę |
 
 Programa sukuria failus:
 * `out/initial_state.csv` – pradinė būsena (vardas, viešasis raktas, pradinis balansas), įrašoma **prieš**
@@ -66,49 +78,46 @@ Programa sukuria failus:
 2. Sugeneruojamos transakcijos (siuntėjas ≠ gavėjas, suma 1..`max-amount`, `sequence` = siuntėjo transakcijų
    skaitliukas). Apie 1 % tyčia sugadinamos: savęs pervedimas, nežinomas gavėjas, suma 0, ID neatitinka turinio,
    dublikatas.
-3. Kiekviena transakcija pateikiama į fondą. Priėmimo metu tikrinama struktūra (hex laukai, `amount > 0`,
-   `sequence ≥ 0`, žinomi vartotojai, siuntėjas ≠ gavėjas, ID = maiša(turinio)), ar ID nėra fonde ir ar nėra
-   jau patvirtintas. Netinkamos atmetamos su priežastimi (`TxError`).
-4. Kol fonde yra įvykdomų transakcijų:
-   * fondas sumaišomas tuo pačiu `seed` atsitiktinumu ir iš jo renkama iki `block-size` transakcijų. Kiekviena
-     kandidatė tikrinama su **darbine būsenos kopija, į kurią jau įskaityti anksčiau į tą patį bloką parinkti
-     mokėjimai** – todėl keli to paties vartotojo mokėjimai bloke negali viršyti jo balanso;
-   * nepakankamo balanso transakcija lieka fonde (laikina klaida – vėliau siuntėjas gali gauti lėšų);
-   * apskaičiuojamas `tx_root`, nuosekliai didinant `nonce` nuo 0 kasamas blokas;
-   * `Blockchain.addBlock` bloką dar kartą **pilnai patikrina** (versija, `prev_hash`, `difficulty`, ne tuščias,
-     `tx_root`, perskaičiuotas PoW, kiekvienos tx struktūra, dublikatai bloke ir grandinėje, balansai, bendra
-     suma, neneigiami balansai) ir tik tada atomiškai pakeičia būseną; įtrauktos transakcijos išimamos iš fondo.
-5. Kai nebelieka nė vienos įvykdomos transakcijos (paskutinis blokas gali būti nepilnas), išspausdinama
-   suvestinė. Visos fonde likusios transakcijos yra neįvykdomos galutinėje būsenoje – `report.txt` kiekvienai
-   nurodo, kiek siuntėjas turi ir kiek reikia.
+3. **1 etapas** – kiekviena transakcija pateikiama į fondą (žr. „Validacija“).
+4. Kiekvienam aukščiui, kol fonde yra įvykdomų transakcijų:
+   * **2 etapas** – sudaromi 5 kandidatai (žr. „Penki kandidatai“);
+   * kandidatai kasami ribotu biudžetu, pagal taisyklę parenkamas laimėtojas;
+   * **3 etapas** – laimėtojas iš naujo pilnai patikrinamas ir vienu veiksmu prijungiamas; jo transakcijos
+     pašalinamos iš fondo. Nelaimėjusių kandidatų poveikio nėra, kitam aukščiui kandidatai sudaromi iš naujo.
+5. Sustojama, kai nė vienas kandidatas nebegauna transakcijų (nėra pažangos) arba kai per `max-rounds` raundų
+   niekas neranda sprendimo. Išspausdinama suvestinė; `report.txt` kiekvienai likusiai transakcijai nurodo,
+   kiek siuntėjas turi ir kiek reikia.
 
 ## Modelis
 
 * **Account modelis**: `State` = `public_key → balansas` (`long`). Transakcija tik perkelia `amount` nuo
-  siuntėjo gavėjui, todėl bendra suma nekinta. Invariantai v0.1: balansai visada `≥ 0`, bendra lėšų suma
-  lygi pradinei, kiekviena sugeneruota transakcija yra arba įtraukta, arba atmesta, arba likusi fonde.
-  Jie tikrinami kiekviename `addBlock` ir simuliacijos pabaigoje (pažeidus – programa baigiasi klaida).
+  siuntėjo gavėjui, todėl bendra suma nekinta. Invariantai: balansai visada `≥ 0`, bendra lėšų suma lygi
+  pradinei, kiekviena sugeneruota transakcija yra arba įtraukta, arba atmesta, arba likusi fonde.
 * **Transakcija**: `sender`, `receiver` (64 hex), `amount`, `sequence`, `id`.
-* **Bloko antraštė** (6 laukai): `prev_hash`, `timestamp` (Unix sekundės), `version` (=1), `tx_root`,
-  `nonce`, `difficulty`. Pirmojo bloko (aukštis 0) `prev_hash` = 64 nuliai.
-* **Blokas** = antraštė + transakcijų sąrašas. Bloko hash nesaugomas – jis visada skaičiuojamas iš antraštės.
+* **Bloko antraštė** (6 laukai): `prev_hash`, `timestamp` (Unix sekundės), `version` (=2), `tx_root`
+  (Merkle šaknis), `nonce`, `difficulty`. Pirmojo bloko (aukštis 0) `prev_hash` = 64 nuliai.
+* **Blokas** = antraštė + 1..100 transakcijų. Bloko hash nesaugomas – jis visada skaičiuojamas iš antraštės.
 
 | Klasė | Paskirtis |
 |---|---|
-| `bc.hash.Hash`, `HashUtil` | savo maišos funkcija, UTF-8 maiša, hex pagalbinės |
+| `bc.hash.Hash`, `HashUtil` | savo maišos funkcija, UTF-8 maiša, hex ↔ baitai |
 | `bc.model.*` | `User`, `Transaction`, `BlockHeader`, `Block` |
-| `bc.core.State` | balansai, `check`/`apply`, suma |
-| `bc.core.Validation`, `Validator` | transakcijos struktūros ir priėmimo į fondą taisyklės |
+| `bc.core.State` | balansai, `check`/`apply` (balansas, perpildymas), suma |
+| `bc.core.Validation` | atskiros transakcijos taisyklių procedūros, bendros visiems etapams |
+| `bc.core.Validator` | 1 etapas – priėmimas į fondą |
+| `bc.core.CandidateBuilder` | 2 etapas – atranka į kandidatą laikinoje būsenoje |
+| `bc.core.Blockchain` | 3 etapas – `checkHeader`, `checkBody`, `applyTransactions`, atominis `addBlock` |
+| `bc.core.BlockError`, `TxError` | bloko ir transakcijos atmetimo priežastys |
+| `bc.core.Merkle` | Merkle medis (`tx_root`) |
+| `bc.core.Pow` | PoW paieška su biudžetu ir patikra |
+| `bc.core.Candidate`, `Competition` | kandidatai, jų kasimas raundais, laimėtojo parinkimas |
 | `bc.core.TxPool` | laukiančios ir atmestos transakcijos |
-| `bc.core.TxRoot` | `tx_root` |
-| `bc.core.Pow` | kasimas ir PoW patikra |
-| `bc.core.Miner` | transakcijų atranka į bloką ir bloko kasimas |
-| `bc.core.Blockchain` | grandinė ir pilna bloko patikra |
+| `bc.core.Miner` | vieno kasėjo režimas (v0.1 API) |
 | `bc.sim.*` | parametrai, deterministinis generatorius, simuliacija ir suvestinė |
 
 ## Kodavimas prieš maišą
 
-Kūrimui ir patikrai naudojamos tos pačios funkcijos (`Transaction.serialize`, `BlockHeader.serialize`).
+Kūrimui ir patikrai naudojamos tos pačios funkcijos (`Transaction.serialize`, `BlockHeader.serialize`, `Merkle.root`).
 
 * **Transakcija**: `sender|receiver|amount|sequence`, koduojama UTF-8, be eilutės pabaigos.
   `transaction_id = H(UTF-8(serializacija))`; pats ID į įvestį neįtraukiamas.
@@ -118,14 +127,133 @@ Kūrimui ir patikrai naudojamos tos pačios funkcijos (`Transaction.serialize`, 
   Bloko hash = `H(UTF-8(serializacija))`, o ne objekto adreso ar `toString()` maiša.
 * Skirtukas `|` laukų reikšmėse negali pasitaikyti: hash laukai turi tik `0-9a-f` (tikrinama `HashUtil.isHash`),
   skaičiai rašomi `Long.toString` – dešimtainiai, be tarpų, pliuso ir nereikalingų pradinių nulių. Todėl
-  `1|23` ir `12|3` duoda skirtingus baitus (žr. testą). Laisvo teksto laukų v0.1 nėra.
-* **`tx_root`** = `H(id_1 id_2 … id_n)` – bloko transakcijų ID sujungti eilės tvarka. Kiekvienas ID lygiai 64
-  simbolių, todėl sujungimas vienareikšmis. `tx_root` yra antraštėje, tad pakeitus bet kurią transakciją ar jų
-  tvarką keičiasi ir bloko hash.
+  `1|23` ir `12|3` duoda skirtingus baitus (žr. testą). Laisvo teksto laukų nėra.
+
+## Merkle medis (`tx_root`, nuo v0.2)
+
+* **Lapai** – transakcijų ID jų tvarka bloke. Prieš jungimą kiekvienas 64 hex ID dekoduojamas į 32 baitus.
+* **Vidinis mazgas** = `H(kairiojo vaiko 32 B || dešiniojo vaiko 32 B)` – jungiami baitai, ne hex tekstas;
+  `H` – ta pati savo maiša.
+* **Neporinis mazgas** lygyje poruojamas su savo kopija: `H(x || x)`.
+* **Vienas lapas** – jis pats yra šaknis (nehešuojamas dar kartą).
+* **Tuščias sąrašas** – `EMPTY_ROOT` = 64 nuliai. Tai apibrėžta tik genesis atvejui; grandinė tuščių blokų
+  nepriima (`BlockError.EMPTY`), o pirmasis blokas visada turi transakcijų.
+
+Pavyzdys su 5 transakcijomis (`a..e` – ID):
+
+```
+lygis 0:  a      b      c      d      e
+lygis 1:  H(a|b)        H(c|d)        H(e|e)
+lygis 2:  H(ab|cd)                    H(ee|ee)
+šaknis:   H(abcd|eeee)
+```
+
+Testai (`MerkleTests`) šaknį 1, 2, 3 ir 5 transakcijoms skaičiuoja nepriklausomai ir lygina su `Merkle.root`;
+tikrina, kad pakeitus bet kurios transakcijos turinį ir perskaičiavus jos ID, taip pat sukeitus bet kurias dvi
+skirtingas transakcijas, šaknis pasikeičia.
+
+**Dokumentuota savybė (ne maišos kolizija).** Dėl neporinio mazgo kopijavimo `[a,b,c]` ir `[a,b,c,c]` turi tą
+pačią šaknį – tai žinomas ir Bitcoin medžio atvejis (CVE-2012-2459). Antrasis sąrašas turi pasikartojantį ID, todėl
+grandinė tokį bloką atmeta (`DUPLICATE_IN_BLOCK`); testas tai patikrina.
+
+**Maišos kolizijos.** Testas sumaišo 200 000 skirtingų įvesčių – kolizijos nerasta. Pilna 256 bitų kolizijos paieška
+nevykdyta; jei kolizija būtų rasta, testas ją praneštų su abiem įvestimis.
+
+## Validacija (trys etapai)
+
+Visi etapai naudoja tas pačias `Validation` procedūras. Vienkartinė patikra prieš fondą negarantuoja, kad
+transakciją bus galima įvykdyti konkrečiame bloke, todėl balansas tikrinamas tik 2 ir 3 etapuose.
+
+| Taisyklė | `TxError` | 1. į fondą | 2. kandidatas | 3. blokas |
+|---|---|---|---|---|
+| laukų formatas (64 hex, `sequence ≥ 0`) | `BAD_FORMAT` | ✔ | ✔ | ✔ |
+| teigiama sveikoji suma | `NON_POSITIVE_AMOUNT` | ✔ | ✔ | ✔ |
+| žinomi dalyviai, siuntėjas ≠ gavėjas | `UNKNOWN_*`, `SELF_TRANSFER` | ✔ | ✔ | ✔ |
+| perskaičiuotas `transaction_id` | `BAD_ID` | ✔ | ✔ | ✔ |
+| ID nėra fonde | `DUPLICATE_IN_POOL` | ✔ | | |
+| ID nėra patvirtintas grandinėje | `ALREADY_CONFIRMED` | ✔ | ✔ | ✔ |
+| ID nesikartoja bloke | `DUPLICATE_IN_BLOCK` | | ✔ | ✔ |
+| balansas laikinoje būsenoje | `INSUFFICIENT_BALANCE` | | ✔ | ✔ |
+| gavėjo balanso perpildymas | `OVERFLOW` | | ✔ | ✔ |
+
+**1. Prieš priimant į fondą** (`Validator.admission`). Balansas netikrinamas: patekimas į fondą lėšų nerezervuoja.
+
+**2. Atrenkant į kandidatą** (`CandidateBuilder.select`). Patvirtinti balansai nukopijuojami į laikiną būseną;
+transakcijos tikrinamos ir taikomos šiai kopijai numatoma tvarka bloke, atrenkama iki 100. Kiekvienas kandidatas
+turi savo kopiją. Pavyzdys (testas `2 etapas: A=100, T1 70 + T2 60`):
+
+| Žingsnis | Kandidato laikina būsena |
+|---|---|
+| Tikriname T1: 70 ≤ 100 | T1 įtraukiama, laikinas A = 30 |
+| Tikriname T2: 60 > 30 | T2 į šį kandidatą neįtraukiama (lieka fonde) |
+| Jei pirmiau T2 | A = 40, tada T1 (70) netinka |
+
+Tikrieji balansai atrankos metu nekinta (testas tai tikrina).
+
+**3. Prieš priimant iškastą bloką** (`Blockchain.addBlock`), atskiros procedūros:
+* `checkHeader`: palaikoma versija (2), `prev_hash` = paskutinio bloko hash, `difficulty` sutampa su grandinės
+  (mažesnis → `LOWERED_DIFFICULTY`, kitas → `BAD_DIFFICULTY`), PoW tikrinamas **pagal grandinės** sudėtingumą,
+  maišą perskaičiuojant – kandidatas negali pats sumažinti reikalavimo;
+* `checkBody`: 1..100 transakcijų (`EMPTY`, `TOO_MANY_TX`), formatas, Merkle šaknis (`BAD_TX_ROOT`);
+* `applyTransactions`: visos transakcijos jų tvarka vienoje patvirtintos būsenos kopijoje (`BAD_TX` + priežastis),
+  bendra suma ir neneigiami balansai.
+
+Tik visam blokui praėjus patikrą, vienu veiksmu atnaujinami blokai, balansai, patvirtintų ID aibė ir fondas.
+Netinkamas blokas nekeičia nieko – testas tikrina balansus, aukštį, paskutinį hash, patvirtintus ID ir fondą.
+
+**Atmesti ar atidėti?** Neteisingas ID, ne teigiama suma, nežinomas dalyvis, savęs pervedimas, dublikatas,
+perpildymas – atmetama su priežastimi. Nepakankamas balansas – **atidedama**: transakcija lieka fonde ir
+tikrinama kiekviename naujame kandidate (siuntėjas gali gauti lėšų). Jei visas atrankos ciklas nesukuria
+pažangos, sustojama ir pateikiama likusių suvestinė.
+
+**`sequence`.** Naudojamas siuntėjo transakcijų skaitliukas iš generatoriaus; kartu su siuntėju jis unikalus ir
+užtikrina skirtingus ID. Griežto eiliškumo (laukti dar neatėjusio numerio) neįgyvendinome – užduotyje to
+nereikalaujama. Pakartotinis tos pačios transakcijos pateikimas blokuojamas per ID (`ALREADY_CONFIRMED`).
+
+**ID ≠ parašas.** Teisingas ID įrodo tik tai, kad turinys nepakeistas po ID apskaičiavimo. Bet kas, žinantis A
+identifikatorių, gali sukurti `A -> B` su teisingu ID – testas `ID atitikimas ... neatstoja paraso` tai parodo.
+Siuntėjo leidimą įrodytų tik skaitmeninis parašas (v0.2 jo nėra).
+
+## Penki kandidatai kitam blokui
+
+**Sudarymas.** Tam pačiam aukščiui sudaromi 5 kandidatai: visi remiasi tuo pačiu `prev_hash`, ta pačia patvirtinta
+būsena ir tuo pačiu `timestamp`. Kiekvienas gauna savo atsitiktinę (nuo `seed` priklausomą) fondo tvarką ir savo
+laikiną būsenos kopiją, todėl jų turinys ir `tx_root` skiriasi. Kandidatų transakcijos gali persidengti, viename
+kandidate ID nesikartoja. Kiekviename iki 100 transakcijų.
+
+**Tikrinimo tvarka ir biudžetas.** Kasama nuosekliai, raundais. Raunde kandidatai tikrinami eilės tvarka
+K1, K2, …, K5. Kiekvienas tęsia nuo savo pirmo dar netikrinto `nonce` ir tikrina, kol randa sprendimą arba
+išnaudoja raundo biudžetą: **2000 bandymų arba 5 s – kas pirmiau**. Jei po raundo niekas nerado, biudžetas
+dvigubinamas (2000, 4000, 8000, …), paieška tęsiama nuo netikrintų `nonce`, sudėtingumas nekeičiamas.
+
+**Bendra riba.** Daugiausia 10 raundų (iki 2 046 000 bandymų kandidatui). Jei sprendimo nerasta, paieška aiškiai
+sustabdoma: išspausdinama priežastis, grandinė nekeičiama, likusios transakcijos lieka fonde. Pvz.
+`./run.sh --budget 10 --max-rounds 1` sustoja jau pirmame aukštyje.
+
+**Laimėtojo taisyklė.** Iš raunde sprendimą radusių laimi tas, kuriam prireikė **mažiausiai bandymų** (bendrai per
+visus raundus); lygiųjų atveju – mažesnis numeris. Tai atitinka „kas pirmas rastų, jei visi kastų lygiagrečiai
+vienodu greičiu“, nors kasama nuosekliai. Laimėtojas iš naujo pilnai patikrinamas (`Blockchain.addBlock`), įtraukiamos
+tik jo transakcijos. Nelaimėjusių kandidatų blokai nebeprisijungia (jų `prev_hash` jau pasenęs), jų transakcijos,
+nepatekusios į laimėtoją, lieka fonde, ir kitam aukščiui kandidatai sudaromi iš naujo.
+
+### Kodėl tai dar nėra P2P konsensusas
+
+* **Vienas procesas, vienas validatorius.** Visi „kasėjai“ yra objektai toje pačioje atmintyje, mato tą patį fondą
+  ir tą pačią patvirtintą būseną. Tikrame tinkle kiekvienas mazgas turi savo fondo ir grandinės vaizdą.
+* **Nėra tinklo.** Nėra blokų ir transakcijų sklaidos, vėlavimų, prarastų žinučių – todėl negali atsirasti dviejų
+  vienu metu rastų blokų ir **šakų**.
+* **Nėra šakų pasirinkimo taisyklės.** Nėra „daugiausia darbo turinčios grandinės“ taisyklės ir persitvarkymų
+  (reorg); laimėtoją parenka viena funkcija pagal mūsų taisyklę, o ne mazgai nepriklausomai.
+* **Konkurencija simuliuojama nuosekliai.** „Kas pirmas“ nustatoma pagal bandymų skaičių, ne pagal tikrą laiką ir
+  skirtingą kasėjų skaičiavimo galią.
+* **Nėra priešininkų ir parašų.** Visi dalyviai sąžiningi, transakcijos nepasirašomos, sudėtingumas nekinta.
+
+Tai parodo, *kaip* kandidatai konkuruoja ir kodėl įtraukiamas tik vieno jų turinys, bet ne tai, *kaip* nepriklausomi
+mazgai be centrinio koordinatoriaus susitaria dėl vienos istorijos.
 
 ## Maišos funkcija
 
-Versija: **KGHash v2 (8 raundai, message schedule, K konstantos, StrictMath)** (`Hash.VERSION`).
+Versija: **KGHash v2 (8 raundai, message schedule, K konstantos, StrictMath)** (`Hash.VERSION`). v0.2 jos nekeitė.
 
 * Išvestis 256 bitai = 8 × 32 bitų žodžiai, kiekvienas `%08x` → visada 64 mažosios hex raidės, pradiniai nuliai
   išlaikomi.
@@ -139,7 +267,7 @@ Pakeitimų žurnalas:
 * v0.1 leidime: `Math.cbrt` pakeista į `StrictMath.cbrt`, kad K konstantos būtų garantuotai vienodos visose
   platformose. Išvestis nepasikeitė – patikrinta testų vektoriais, formato ir determinizmo testai pakartoti.
 
-Testų vektoriai (užfiksuoti `test/bc/Tests.java`):
+Testų vektoriai:
 
 | Įvestis (UTF-8) | Maiša |
 |---|---|
@@ -152,76 +280,105 @@ Testų vektoriai (užfiksuoti `test/bc/Tests.java`):
 
 * Sąlyga: bloko hash hex užrašas prasideda bent `difficulty` nulių (pagrindinis bandymas `difficulty = 3`,
   t. y. `000…`, vidutiniškai ~4096 bandymai).
-* `nonce` didinamas nuosekliai nuo 0, kiti antraštės laukai (ir `timestamp`) vieno bloko paieškoje fiksuoti.
-* Gauta maiša niekaip nekeičiama. `Pow.isValid` ir `Blockchain.addBlock` maišą visada **perskaičiuoja** iš
-  antraštės laukų; išsaugotu hash nepasitikima (jis net nesaugomas).
+* `nonce` didinamas nuosekliai nuo 0, kiti antraštės laukai vieno kandidato paieškoje fiksuoti.
+* Gauta maiša niekaip nekeičiama. PoW visada tikrinamas **perskaičiuojant** maišą iš antraštės laukų ir pagal
+  grandinės nustatytą sudėtingumą.
 * Tai mokomasis sudėtingumo apibrėžimas; Bitcoin `target` ir sudėtingumo perskaičiavimas nerealizuoti.
 
 ## Generavimo seed ir atkuriamumas
 
-Numatytas seed: **20261029**. Naudojamas `java.util.Random`, kurio algoritmas apibrėžtas Java specifikacijoje,
-todėl tas pats seed visur duoda tuos pačius vartotojus, transakcijas, jų ID ir transakcijų atranką į blokus.
-Konsolėje rodomas `tx_set_fp` – visų sugeneruotų transakcijų ID maiša; su numatytais parametrais ji visada
-`9b19c7458f52b60f2676146510e28536a2c7489c229ec4a6d02cab72ea2a6ca9`.
+Numatytas seed: **20261029**. `java.util.Random` algoritmas apibrėžtas Java specifikacijoje, todėl tas pats seed
+visur duoda tuos pačius vartotojus, transakcijas, jų ID ir kandidatų tvarkas. Konsolėje rodomas `tx_set_fp` – visų
+sugeneruotų transakcijų ID maiša; su numatytais parametrais ji visada
+`9b19c7458f52b60f2676146510e28536a2c7489c229ec4a6d02cab72ea2a6ca9` (v0.1 ir v0.2 sutampa).
 
-Bloko hash priklauso ir nuo `timestamp`, todėl tarp paleidimų skiriasi (`tx_root` – ne). Su `--fixed-time`
-(`timestamp` = aukštis) atkuriama visa grandinė: su numatytais parametrais paskutinio bloko hash visada
-`000e250d87888e0574de905fde4d7b16a3bff82fa94e90a8fc01f847c015155b`.
+Bloko hash priklauso ir nuo `timestamp`, todėl be `--fixed-time` blokai ir laimėtojai tarp paleidimų skiriasi.
+Su `--fixed-time` visa grandinė atkuriama: su numatytais parametrais paskutinio bloko hash visada
+`0001bb1ec03a3d2b3bb8da33b4fe8fd8e31d56363160ef95f85cd7f1b2991b2a` (98 blokai, 9717 įtrauktų tx).
+Laiko biudžetas (5 s) su numatytais parametrais nepasiekiamas, todėl rezultato nekeičia.
 
-## Išvesties pavyzdys (`./run.sh`, numatyti parametrai)
+## Išvesties pavyzdys (`./run.sh --verbose`, numatyti parametrai)
 
 ```
-=== Blockchain v0.1 ===
+=== Blockchain v0.2 ===
 hash:        KGHash v2 (8 raundai, message schedule, K konstantos, StrictMath)
 seed:        20261029
 parametrai:  users=1000 txs=10000 block_size=100 difficulty=3 max_amount=50000 invalid_rate=0.01
+kandidatai:  5 aukstiui, biudzetas 2000 bandymu arba 5000 ms kandidatui per raunda, nepavykus x2, daugiausia 10 raundu
 tx_set_fp:   9b19c7458f52b60f2676146510e28536a2c7489c229ec4a6d02cab72ea2a6ca9  (visu sugeneruotu tx ID maisa)
 fondas:      priimta 9900, atmesta priimant 100
 
-Blokas #0 | tx=100
+Blokas #0 | tx=100 | laimetojas K2
   prev_hash:  0000000000000000000000000000000000000000000000000000000000000000
-  tx_root:    7397dfd167788f658b2e00ff8ea1df1ed1f5eb89a111ca61d3dcf9ce1cf40988
-  hash:       000e5039a97e8109b018c0e4e233e60dcb689b23eb35b08f50b8b209d84e395a
-  difficulty=3 nonce=10042 bandymai=10043 laikas=101.6 ms timestamp=1794918067
+  tx_root:    cc2bb4d3729d8aa92266fb92e2489369692b65dd7d3c53349b12a5e4e4287d58  (Merkle)
+  hash:       000526770ca8355f63c5412e85ba020e3373639aee814812892521d425f9ad84
+  difficulty=3 nonce=282 bandymai=283 laikas=3.5 ms timestamp=1795440336
+  konkurencija: 5 kandidatai, raundai=1, biudzetas=2000, visi bandymai=7190, laikas=96.6 ms
+    K1 tx=100 tx_root=f06d5f32e915a560... bandymai=1666   laikas=  29.1 ms rado nonce=1665
+    K2 tx=100 tx_root=cc2bb4d3729d8aa9... bandymai=283    laikas=   3.5 ms LAIMEJO nonce=282
+    K3 tx=100 tx_root=f6ada547f5ee2044... bandymai=1241   laikas=  23.8 ms rado nonce=1240
+    K4 tx=100 tx_root=c964e799562e26d9... bandymai=2000   laikas=  20.7 ms nerado
+    K5 tx=100 tx_root=77dc503468946102... bandymai=2000   laikas=  19.5 ms nerado
 
 ...
 
-Blokas #97 | tx=25
-  prev_hash:  ...
-  tx_root:    a1c9e63c7c519f36119c1b23e8b692caa311ab7cda2905d686cab2e192dd7bcb
-  hash:       00008a1100095d850c70f8614be68724a077eb041dcc722d5dc7b46030b885e6
-  difficulty=3 nonce=727 bandymai=728 laikas=3.8 ms timestamp=1794918070
+Blokas #8 | tx=100 | laimetojas K2
+  prev_hash:  000772a218d6e1c38dd6287db7fc04a540cc89a2877d8c2ba7dfe4e2640ce2ae
+  tx_root:    eedf82484cbcc75ff4e01e60c54aa21784ccf62411aa30ac22289c9a3b5da04c  (Merkle)
+  hash:       000c3b41496f092a10b955503e6558ce17c90558daacc0318f0c0924c0241e0b
+  difficulty=3 nonce=2223 bandymai=2224 laikas=11.3 ms timestamp=1795440337
+  konkurencija: 5 kandidatai, raundai=2, biudzetas=4000, visi bandymai=14465, laikas=60.3 ms
+    K1 tx=100 tx_root=9289868961ec28e6... bandymai=2853   laikas=  11.2 ms rado nonce=2852
+    K2 tx=100 tx_root=eedf82484cbcc75f... bandymai=2224   laikas=  11.3 ms LAIMEJO nonce=2223
+    K3 tx=100 tx_root=805ae6297b98012b... bandymai=2478   laikas=   9.5 ms rado nonce=2477
+    K4 tx=100 tx_root=3fb454aa6c0e0ddd... bandymai=3333   laikas=  13.4 ms rado nonce=3332
+    K5 tx=100 tx_root=548d092f1d9972d9... bandymai=3577   laikas=  14.9 ms rado nonce=3576
+
+...
 
 === Suvestine ===
+sustojimo priezastis:  fonde nebeliko ivykdomu transakciju
 vartotojai:            1000
 transakcijos (sugen.): 10000
 priimti blokai:        98
-itrauktos tx:          9725
+itrauktos tx:          9720
 atmestos tx:           100
     UNKNOWN_RECEIVER       20 (nezinomas gavejas)
     SELF_TRANSFER          19 (siuntejas sutampa su gaveju)
     NON_POSITIVE_AMOUNT    25 (suma ne teigiama)
     BAD_ID                 22 (transaction_id neatitinka turinio)
     DUPLICATE_IN_POOL      14 (ID jau yra fonde)
-likusios fonde tx:     175
-    INSUFFICIENT_BALANCE   175 (nepakankamas balansas, galutineje busenoje)
+likusios fonde tx:     180
+    180 - INSUFFICIENT_BALANCE (nepakankamas balansas, galutineje busenoje)
 pradine lesu suma:     481767596
 galutine lesu suma:    481767596  (sutampa)
-maziausias balansas:   225
-paskutinio bloko hash: 00008a1100095d850c70f8614be68724a077eb041dcc722d5dc7b46030b885e6
-kasimo laikas:         2.033 s
-bendras laikas:        2.981 s
+maziausias balansas:   325
+paskutinio bloko hash: 00026a628053f61a754734109feb1d21c4b4cb47a666950ef93ce5953f7495f5
+konkursu (aukstiu):    98, is ju su padidintu biudzetu: 7
+bandymai is viso:      848265 (laimetoju 67261, nelaimejusiu 781004)
+kasimo laikas:         3.940 s
+kandidatas  sudaryta  laimejo  bandymai   laikas
+  K1              98       14    176540   0.856 s
+  K2              98       20    170447   0.785 s
+  K3              98       22    168882   0.790 s
+  K4              98       20    164274   0.748 s
+  K5              98       22    168122   0.762 s
+bendras laikas:        5.309 s
 patikra: itrauktos+atmestos+likusios = 10000 = sugeneruota 10000 (OK)
 pilnas atmestu/likusiu tx paaiskinimas: out/report.txt
 pradine busena: out/initial_state.csv
 ```
 
-Paskutinis blokas (#97) nepilnas – 25 transakcijos. 175 likusios transakcijos yra neįvykdomos galutinėje
-būsenoje, pvz. iš `out/report.txt`: `... ,7199,0,INSUFFICIENT_BALANCE (turi 4845, reikia 7199)`.
+Bloke #8 su pradiniu 2000 bandymų biudžetu niekas nerado sprendimo, todėl biudžetas padidintas iki 4000; kandidatų
+`bandymai` yra bendri per abu raundus (pvz. K5: 2000 + 1577). `biudzetas` rodo paskutinio raundo biudžetą.
+Be `--verbose` kandidatų eilutės nespausdinamos – lieka bloko ir `konkurencija` eilutės bei galutinė lentelė.
 
 ## Testai (`./test.sh`)
 
+40 testų keturiose grupėse (`test/bc/`):
+
 ```
+--- v0.1: maisa, serializacija, PoW, balansai ---
 [OK]   maisos formatas: 64 mazosios hex, pradiniai nuliai islaikomi
 [OK]   maisos determinizmas ir uzfiksuoti vektoriai
 [OK]   serializacija sender|receiver|amount|sequence
@@ -234,10 +391,48 @@ būsenoje, pvz. iš `out/report.txt`: `... ,7199,0,INSUFFICIENT_BALANCE (turi 48
 [OK]   netinkami blokai atmetami (prev_hash, tx_root, difficulty, tuscias)
 [OK]   visa simuliacija: invariantai ir atkuriamumas su --fixed-time
 
-Rezultatas: 11 praejo, 0 nepavyko
+--- v0.2: Merkle medis ---
+[OK]   tuscias sarasas -> EMPTY_ROOT (64 nuliai, tik genesis)
+[OK]   1 tx: saknis = pats ID
+[OK]   2 tx: H(a||b) is baitu, ne is hex teksto
+[OK]   3 tx: neporinis poruojamas su kopija
+[OK]   5 tx: lygiai 5-3-2-1
+[OK]   pakeitus tx turini ir perskaiciavus ID saknis pasikeicia (1,2,3,5)
+[OK]   sukeitus skirtingu tx tvarka saknis pasikeicia (2,3,5)
+[OK]   zinoma struktura: [a,b,c] ir [a,b,c,c] ta pati saknis -> dublikatas blokuojamas
+[OK]   200 000 skirtingu ivesciu - maisos kolizijos nerasta
+
+--- v0.2: transakciju ir bloko validacija (3 etapai) ---
+[OK]   1 etapas: netinkamos tx neprileidziamos i fonda (kiekviena taisykle atskirai)
+[OK]   1 etapas: patekimas i fonda lesu nerezervuoja
+[OK]   2 etapas: A=100, T1 70 + T2 60 -> i kandidata tik viena (abi tvarkos)
+[OK]   2 etapas: du mokejimai po 70 is 100 negali abu patekti
+[OK]   2 etapas: kandidato atranka nekeicia tikruju balansu
+[OK]   balanso perpildymas aptinkamas
+[OK]   3 etapas: bloko antrastes klaidos (versija, prev_hash, sudetingumas, PoW)
+[OK]   3 etapas: kandidatas negali pats sumazinti sudetingumo
+[OK]   3 etapas: turinio klaidos (tuscias, per daug tx, tx_root)
+[OK]   3 etapas: blogos tx bloke (balansas, dalyvis, ID, dublikatas, patvirtinta, suma)
+[OK]   3 etapas: tx tikrinamos ju tvarka bloke vienoje laikinoje busenoje
+[OK]   atmestas blokas nekeicia grandines, balansu, patvirtintu ID ir fondo
+[OK]   priimtas blokas vienu veiksmu atnaujina grandine, balansus ir fonda
+[OK]   ID atitikimas tikrina vientisuma, bet neatstoja paraso
+
+--- v0.2: penki kandidatai ---
+[OK]   5 kandidatai: tas pats prev_hash ir busena, <=100 tx, be pasikartojimu viduje
+[OK]   kandidatai skiriasi, bet gali persidengti; tikroji busena nepakinta
+[OK]   padidinus biudzeta paieska tesiama nuo netikrintu nonce, sudetingumas nemazinamas
+[OK]   laimetojas = maziausiai bandymu is radusiu; perpatikrinamas ir prijungiamas
+[OK]   nelaimejusieji neturi poveikio; ju blokas po laimetojo atmetamas
+[OK]   bendra riba: per maxRounds nerasta -> aiskus sustojimas, niekas nepakeista
+
+Rezultatas: 40 praejo, 0 nepavyko
 ```
 
-Rankomis patikrinamas atvejis (bloko dydis 2, `difficulty = 2`, fondo tvarka):
+Testų patikimumas patikrintas mutacijomis: neporinį Merkle mazgą „perkėlus aukštyn“ vietoj kopijavimo, PoW tikrinant
+pagal antraštės (ne grandinės) sudėtingumą arba kiekviename raunde pradedant `nonce` nuo 0, atitinkami testai krenta.
+
+Rankomis patikrinamas atvejis (v0.1, bloko dydis 2, `difficulty = 2`, fondo tvarka):
 
 | | A | B | C | Pastaba |
 |---|---|---|---|---|
@@ -247,8 +442,8 @@ Rankomis patikrinamas atvejis (bloko dydis 2, `difficulty = 2`, fondo tvarka):
 | Blokas 2: C→A 15 (nepilnas) | 45 | 0 | 105 | suma 150 |
 | Lieka fonde: A→B 60 | | | | 45 < 60 → `INSUFFICIENT_BALANCE` |
 
-## Apribojimai ir v0.2 planas
+## Apribojimai
 
-* Parašų nėra: `public_key` yra tik imituotas identifikatorius, transakcijos nepasirašomos.
-* `sequence` užtikrina ID unikalumą, bet v0.1 netikrina jo eiliškumo (replay apsauga – per ID dublikatų patikrą).
-* v0.2: validavimo taisyklės bus išskirtos į atskiras procedūras, pridėti neigiami testai kiekvienai taisyklei.
+* Parašų nėra: `public_key` – tik imituotas identifikatorius, transakcijos nepasirašomos.
+* `sequence` netikrinamas kaip griežtas siuntėjo skaitiklis (žr. „Validacija“).
+* Konkurencija simuliuojama nuosekliai viename procese – tai ne P2P konsensusas (žr. aukščiau).

@@ -15,9 +15,7 @@ public final class TxPool {
     private final List<Rejection> rejected = new ArrayList<>();
 
     public TxError submit(Transaction tx, Blockchain chain) {
-        TxError e = Validation.checkStructure(tx, chain.state());
-        if (e == null && pending.containsKey(tx.id())) e = TxError.DUPLICATE_IN_POOL;
-        if (e == null && chain.isConfirmed(tx.id())) e = TxError.ALREADY_CONFIRMED;
+        TxError e = Validator.admission(tx, chain, this);
         if (e != null) {
             rejected.add(new Rejection(tx, e));
             return e;
