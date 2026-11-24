@@ -1,8 +1,15 @@
-# Blockchain v0.2
+# Blockchain v0.3
 
 Mokomoji vieno proceso blokų grandinė Java kalba: savo maišos funkcija, transakcijų fondas, Merkle medis,
 trijų etapų transakcijų ir blokų validacija, darbo įrodymas (PoW) ir penkių kandidatų konkurencija dėl kiekvieno
 bloko. Išorinių bibliotekų nėra.
+
+**v0.3 naujovės** (patobulinta su DI įrankiu; v0.1 ir v0.2 reikalavimai išlaikyti, rezultatai identiški):
+* kasimas ~9× greitesnis: `Hash.toHex` be `String.format` ir midstate (`PrefixHasher`) kasimo cikle;
+* netinkamo formato blokai ir `null` reikšmės atmetamos su priežastimi, o ne `NullPointerException`;
+* bendras 5 skyriaus teisingumo rinkinys, paleistas ir v0.2, ir v0.3; 53 testai;
+* palyginimas, išvados ir DI žurnalas – skyrius [„v0.3: patobulinimas su DI“](#v03-patobulinimas-su-di),
+  [`docs/DI_ZURNALAS.md`](docs/DI_ZURNALAS.md).
 
 **v0.2 naujovės** (v0.1 eiga išlaikyta):
 * `tx_root` – Merkle medžio šaknis (bloko formato versija 2);
@@ -109,7 +116,8 @@ Programa sukuria failus:
 | `bc.core.Blockchain` | 3 etapas – `checkHeader`, `checkBody`, `applyTransactions`, atominis `addBlock` |
 | `bc.core.BlockError`, `TxError` | bloko ir transakcijos atmetimo priežastys |
 | `bc.core.Merkle` | Merkle medis (`tx_root`) |
-| `bc.core.Pow` | PoW paieška su biudžetu ir patikra |
+| `bc.core.Pow` | PoW paieška su biudžetu (v0.3: midstate) ir patikra |
+| `bc.hash.PrefixHasher` | v0.3: maiša su iš anksto apskaičiuota pastovaus prefikso būsena |
 | `bc.core.Candidate`, `Competition` | kandidatai, jų kasimas raundais, laimėtojo parinkimas |
 | `bc.core.TxPool` | laukiančios ir atmestos transakcijos |
 | `bc.core.Miner` | vieno kasėjo režimas (v0.1 API) |
@@ -284,20 +292,25 @@ Testų vektoriai:
 * Gauta maiša niekaip nekeičiama. PoW visada tikrinamas **perskaičiuojant** maišą iš antraštės laukų ir pagal
   grandinės nustatytą sudėtingumą.
 * Tai mokomasis sudėtingumo apibrėžimas; Bitcoin `target` ir sudėtingumo perskaičiavimas nerealizuoti.
+* v0.3: kasant pastovi antraštės dalis `prev_hash|timestamp|version|tx_root|` sumaišoma vieną kartą (midstate),
+  kiekvienam bandymui – tik `nonce|difficulty`. Tikrinimas (`Pow.meets`, `Blockchain.checkHeader`) liko toks pat –
+  pilna maiša iš visų šešių laukų; rastas sprendimas papildomai patikrinamas pilna maiša.
 
 ## Generavimo seed ir atkuriamumas
 
 Numatytas seed: **20261029**. `java.util.Random` algoritmas apibrėžtas Java specifikacijoje, todėl tas pats seed
 visur duoda tuos pačius vartotojus, transakcijas, jų ID ir kandidatų tvarkas. Konsolėje rodomas `tx_set_fp` – visų
 sugeneruotų transakcijų ID maiša; su numatytais parametrais ji visada
-`9b19c7458f52b60f2676146510e28536a2c7489c229ec4a6d02cab72ea2a6ca9` (v0.1 ir v0.2 sutampa).
+`9b19c7458f52b60f2676146510e28536a2c7489c229ec4a6d02cab72ea2a6ca9` (v0.1, v0.2 ir v0.3 sutampa).
 
 Bloko hash priklauso ir nuo `timestamp`, todėl be `--fixed-time` blokai ir laimėtojai tarp paleidimų skiriasi.
 Su `--fixed-time` visa grandinė atkuriama: su numatytais parametrais paskutinio bloko hash visada
-`0001bb1ec03a3d2b3bb8da33b4fe8fd8e31d56363160ef95f85cd7f1b2991b2a` (98 blokai, 9717 įtrauktų tx).
+`0001bb1ec03a3d2b3bb8da33b4fe8fd8e31d56363160ef95f85cd7f1b2991b2a` (98 blokai, 9717 įtrauktų tx; v0.2 ir v0.3 sutampa).
 Laiko biudžetas (5 s) su numatytais parametrais nepasiekiamas, todėl rezultato nekeičia.
 
 ## Išvesties pavyzdys (`./run.sh --verbose`, numatyti parametrai)
+
+Pavyzdys užfiksuotas su v0.2; v0.3 išvestis tokia pati, skiriasi tik antraštės eilutė ir laikai (žr. palyginimą).
 
 ```
 === Blockchain v0.2 ===
@@ -375,7 +388,10 @@ Be `--verbose` kandidatų eilutės nespausdinamos – lieka bloko ir `konkurenci
 
 ## Testai (`./test.sh`)
 
-40 testų keturiose grupėse (`test/bc/`):
+v0.3: 53 testai šešiose grupėse. Žemiau – 40 v0.2 testų (jų failai v0.3 nepakeisti); papildomai
+6 v0.3 lygiavertiškumo testai (`V03Tests`) ir 7 bendro rinkinio testai (`CorrectnessSuite`, žr. v0.3 skyrių).
+
+v0.2 testų grupės (`test/bc/`):
 
 ```
 --- v0.1: maisa, serializacija, PoW, balansai ---
@@ -442,8 +458,73 @@ Rankomis patikrinamas atvejis (v0.1, bloko dydis 2, `difficulty = 2`, fondo tvar
 | Blokas 2: C→A 15 (nepilnas) | 45 | 0 | 105 | suma 150 |
 | Lieka fonde: A→B 60 | | | | 45 < 60 → `INSUFFICIENT_BALANCE` |
 
+## v0.3: patobulinimas su DI
+
+**Įrankis:** Claude Code (Anthropic), modelis `claude-opus-5-5`, 2026-11-24. Užklausos, pasiūlymai, patikros
+ir atmetimo priežastys – [`docs/DI_ZURNALAS.md`](docs/DI_ZURNALAS.md). **Atskaita** – užfiksuota v0.2
+(žyma `0.2`, commit `1d9999d`). Ji nėra „be DI“: v0.1 dalis ir visa v0.2 realizacija taip pat sukurtos su Claude Code
+(atskleista žurnale).
+
+**Kryptys:** kasimo ciklo efektyvumas, Merkle medžio efektyvumas, validavimo klaidos, testų aprėptis.
+
+| Pasiūlymas | Sprendimas | Commit |
+|---|---|---|
+| T1 bendras teisingumo rinkinys + `Bench` (veikia su v0.2 ir v0.3) | priimta | `7ab1a1c` |
+| S1 `Hash.toHex` lentele vietoj `String.format` | priimta | `8514e78` |
+| S2 midstate kasimo cikle (`PrefixHasher`) | priimta | `c09a524` |
+| S3 Merkle vidiniai mazgai baitais | atmesta: ~6 % Merkle, ~1 % visos eigos | – |
+| S4 netinkamo formato blokai / `null` → atmetimas, ne NPE | priimta | `d278416` |
+| S5 `hasValidId` kešavimas | atmesta: −15 % laiko, bet 3 etapas nebeperskaičiuotų ID | – |
+| S6 lygiagretus kasimas, S7 mažiau raundų / SHA-256 | atmesta (neįgyvendinta) | – |
+
+### Palyginimas: v0.2 ir v0.3
+
+Ta pati pradinė būsena (seed 20261029), tie patys duomenys ir `difficulty = 3`, `--fixed-time`; ta pati mašina
+(OpenJDK 21, 4 branduoliai). Našumas – `test/bc/Bench.java` (naudoja tik v0.2 API, mediana iš 7).
+
+| Matas | v0.2 (`0.2`) | v0.3 | Pokytis |
+|---|---|---|---|
+| savi testai | 40/40 | 53/53 | +13 testų |
+| bendras teisingumo rinkinys (7) | 7/7 | 7/7 | tas pats |
+| simuliacijos konsolės išvestis be laikų (1214 eil.), `report.txt`, `initial_state.csv` | – | – | **identiški** |
+| paskutinio bloko hash | `0001bb1e…91b2a` | `0001bb1e…91b2a` | tas pats |
+| 20 antraščių, difficulty 4: rasti nonce / bandymai | 1 276 057 | 1 276 057 | tie patys |
+| kasimo greitis | 195 326 bandymai/s | 1 779 701 bandymai/s | **×9,1** |
+| vienos 146 B antraštės maiša | 5 075 ns | 2 865 ns | −44 % |
+| atmintis kasant | 6 441 B / bandymui | ~1 B / bandymui | **−99,98 %** |
+| Merkle šaknis (100 tx) | 412 µs | 186 µs | −55 % (dėl S1) |
+| visa simuliacija | 5 803 ms | 1 190 ms | **×4,9** |
+| `prev_hash = null`, `addBlock(null)`, `submit(null)` | `NullPointerException` | `BAD_FORMAT` atmetimas | ištaisyta |
+
+Paleidimas: `java -cp out/classes:out/test bc.CorrectnessSuite` ir `java -cp out/classes:out/test bc.Bench`
+(Windows: `"out\classes;out\test"`). Matavimai priklauso nuo mašinos – svarbūs santykiai, ne absoliutūs skaičiai.
+
+### Išvados
+
+**Pagerėjo:** kasimas ~9 kartus greitesnis ir beveik be atminties išskyrimo, visa simuliacija ~5 kartus greitesnė,
+Merkle – 2 kartus (šalutinis S1 efektas); netinkami blokai nebelaužia programos; atsirado bendras teisingumo rinkinys ir
+lygiavertiškumo testai, kurie optimizuotą kodą lygina su v0.2 algoritmu.
+
+**Nepasikeitė (sąmoningai):** visi rezultatai – maišos, nonce, bandymų skaičiai, blokai, balansai, ataskaitos –
+sutampa su v0.2. Maišos algoritmas, serializacija, validavimo taisyklės ir laimėtojo taisyklė nekeisti. PoW
+tikrinimas vis dar perskaičiuoja pilną maišą.
+
+**Nepagerėjo / atmesta:** Merkle skaičiavimas baitais (S3) naudos beveik nedavė – laiką lemia pati maiša;
+ID kešavimas (S5) būtų davęs 15 %, bet pažeistų etapų atskyrimą. Abu įrodymai – DI žurnale.
+
+**Kas tapo sudėtingiau:** kasimo kelias (`PrefixHasher`) yra antras būdas skaičiuoti tą pačią maišą; jį saugo
+lygiavertiškumo testai ir saugiklis, kuris kiekvieną sprendimą patikrina pilna maiša.
+
+**DI pasiūlymas nėra teisingumo įrodymas:** pirmoje bendro rinkinio versijoje DI parašė klaidingą testo scenarijų
+(krito abiejose versijose, pataisytas); kiekvienas priimtas pakeitimas tikrintas testais, mutacijomis ir v0.2
+išvesties palyginimu, o ne remiantis DI teiginiu.
+
 ## Apribojimai
 
 * Parašų nėra: `public_key` – tik imituotas identifikatorius, transakcijos nepasirašomos.
 * `sequence` netikrinamas kaip griežtas siuntėjo skaitiklis (žr. „Validacija“).
 * Konkurencija simuliuojama nuosekliai viename procese – tai ne P2P konsensusas (žr. aukščiau).
+* Maišos funkcija lieka mokomoji; jos kriptografinis atsparumas netirtas (200 000 įvesčių be kolizijų nėra įrodymas).
+* Didžiausią laiko dalį dabar sudaro pati maiša (`Hash.compress`); toliau greitinti galima tik keičiant algoritmą arba
+  lygiagretinant, o tai v0.3 atmesta.
+* Našumo matavimai atlikti vienoje mašinoje, be JMH; skaičiai orientaciniai.

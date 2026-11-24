@@ -53,7 +53,7 @@ public final class Simulation {
         TxPool pool = new TxPool();
         for (Transaction tx : generated) pool.submit(tx, chain);
 
-        System.out.println("=== Blockchain v0.2 ===");
+        System.out.println("=== Blockchain v0.3 ===");
         System.out.println("hash:        " + Hash.VERSION);
         System.out.println("seed:        " + cfg.seed());
         System.out.printf("parametrai:  users=%d txs=%d block_size=%d difficulty=%d max_amount=%d invalid_rate=%s%n",
