@@ -5,7 +5,12 @@ import bc.hash.HashUtil;
 public record BlockHeader(String prevHash, long timestamp, int version, String txRoot, long nonce, int difficulty) {
 
     public String serialize() {
-        return prevHash + '|' + timestamp + '|' + version + '|' + txRoot + '|' + nonce + '|' + difficulty;
+        return serializePrefix() + nonce + '|' + difficulty;
+    }
+
+    /** Pastovi antraštės dalis kasant: prev_hash|timestamp|version|tx_root| (serialize() = prefix + nonce|difficulty). */
+    public String serializePrefix() {
+        return prevHash + '|' + timestamp + '|' + version + '|' + txRoot + '|';
     }
 
     public String hash() {

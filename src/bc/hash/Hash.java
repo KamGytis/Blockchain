@@ -32,52 +32,84 @@ public class Hash {
     }
 
     public static String hash(byte[] data) {
+        return toHex(hashWords(data));
+    }
+
+    /** Maiša kaip 8 žodžiai (be hex konvertavimo). hash(data) == toHex(hashWords(data)). */
+    public static int[] hashWords(byte[] data) {
         byte[] padded = pad(data);
         int[] h = INIT.clone();
+        int[] w = new int[STEPS];
         int[] saved = new int[8];
-        int[] w = new int[STEPS];                      // NAUJA: message schedule, naudojamas iš naujo
-
         for (int block = 0; block < padded.length; block += 32) {
+            compress(h, padded, block, w, saved);
+        }
+        return h;
+    }
 
-            System.arraycopy(h, 0, saved, 0, 8);
+    static int[] initialState() {
+        return INIT.clone();
+    }
 
-            // NAUJA: message schedule (8 žodžiai -> 64)
+    /** Kiek pradinių hex nulių turi toHex(words) – be eilutės kūrimo. */
+    public static int leadingHexZeros(int[] words) {
+        int zeros = 0;
+        for (int word : words) {
+            if (word == 0) {
+                zeros += 8;
+                continue;
+            }
+            return zeros + Integer.numberOfLeadingZeros(word) / 4;
+        }
+        return zeros;
+    }
+
+    public static String toHexString(int[] words) {
+        return toHex(words);
+    }
+
+    /**
+     * Vieno 32 baitų bloko suspaudimas (v0.3: išskirta iš hash() be algoritmo pakeitimų, kad būtų galima
+     * išsaugoti tarpinę būseną – midstate). w ir saved – darbiniai masyvai, kad nereikėtų jų kurti kas kartą.
+     */
+    static void compress(int[] h, byte[] p, int off, int[] w, int[] saved) {
+        System.arraycopy(h, 0, saved, 0, 8);
+
+        // NAUJA: message schedule (8 žodžiai -> 64)
+        for (int i = 0; i < 8; i++) {
+            w[i] = readWord(p, off + i * 4);
+        }
+        for (int t = 8; t < STEPS; t++) {
+            w[t] = w[t - 8] + smallSigma0(w[t - 7]) + w[t - 3] + smallSigma1(w[t - 2]);
+        }
+
+        // pradinio "h ^= words" nebėra: žinutė dabar įterpiama kiekviename žingsnyje per w[t]
+        for (int round = 0; round < ROUNDS; round++) {
             for (int i = 0; i < 8; i++) {
-                w[i] = readWord(padded, block + i * 4);
-            }
-            for (int t = 8; t < STEPS; t++) {
-                w[t] = w[t - 8] + smallSigma0(w[t - 7]) + w[t - 3] + smallSigma1(w[t - 2]);
-            }
+                int t = round * 8 + i;
+                int next = h[(i + 1) & 7];
+                int previous = h[(i + 7) & 7];
+                int opposite = h[(i + 4) & 7];     // NAUJA: trečias žodis Ch/Maj funkcijoms
 
-            // pradinio "h ^= words" nebėra: žinutė dabar įterpiama kiekviename žingsnyje per w[t]
-            for (int round = 0; round < ROUNDS; round++) {
-                for (int i = 0; i < 8; i++) {
-                    int t = round * 8 + i;
-                    int next = h[(i + 1) & 7];
-                    int previous = h[(i + 7) & 7];
-                    int opposite = h[(i + 4) & 7];     // NAUJA: trečias žodis Ch/Maj funkcijoms
+                int x = h[i];
+                x += next;
+                x ^= bigSigma1(previous);
+                x ^= smallSigma0(x);
+                x += smallSigma1(next);
+                x ^= bigSigma0(previous);
 
-                    int x = h[i];
-                    x += next;
-                    x ^= bigSigma1(previous);
-                    x ^= smallSigma0(x);
-                    x += smallSigma1(next);
-                    x ^= bigSigma0(previous);
+                // NAUJA: netiesiškumas + raundo konstanta + žinutės žodis
+                x += ch(previous, next, opposite);
+                x ^= maj(previous, next, opposite);
+                x += K[t] + w[t];
 
-                    // NAUJA: netiesiškumas + raundo konstanta + žinutės žodis
-                    x += ch(previous, next, opposite);
-                    x ^= maj(previous, next, opposite);
-                    x += K[t] + w[t];
-
-                    h[i] = x;
-                }
-            }
-
-            for (int i = 0; i < 8; i++) {
-                h[i] += saved[i];
+                h[i] = x;
             }
         }
-        return toHex(h);
+
+        for (int i = 0; i < 8; i++) {
+            h[i] += saved[i];
+        }
     }
 
     // NAUJA: netiesinės funkcijos
