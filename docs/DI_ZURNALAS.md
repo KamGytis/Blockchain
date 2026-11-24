@@ -12,8 +12,6 @@
 
 ## DI pagalba ankstesniuose etapuose (atskleidimas)
 
-v0.3 palyginimo atskaita – užfiksuota v0.2 (žyma `0.2`, commit `1d9999d`). **Ji nėra „be DI“.**
-
 | Etapas | Autorius (rankomis) | DI (Claude Code) |
 |---|---|---|
 | v0.1 (2026-11-17) | maišos funkcija `Hash`/`HashUtil`, modelio klasės, `State`, `TxError`, `TxPool`, `TxRoot`, `Validation` pradinės versijos (commit'ai `2a5905a`–`9f4fed5`); vėliau „Fix: State“, „Fix: removed comments“ UTF-8 BOM pašalinimas, `Blockchain`, `Validator`, `Pow`, `Miner`, `sim.*`, `State` papildymas, `Math.cbrt` → `StrictMath.cbrt`, testai, skriptai,  Windows `.bat` ir `.gitattributes` (`e2d4f4c`) | README |
