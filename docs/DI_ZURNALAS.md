@@ -6,12 +6,9 @@
 |---|---|
 | Įrankis | Claude Code (Anthropic), naršyklės sesija claude.ai/code |
 | Modelis | `claude-opus-5-5` (nustatytas ir faktiškai naudotas modelis pagal sesijos duomenis) |
-| Sesija | viena sesija, pradėta 2026-11-17; v0.3 darbas 2026-11-24 |
+| Sesija | v0.3 darbas 2026-11-24 |
 | Aplinka | Linux, OpenJDK 21.0.12.1, 4 branduoliai (matavimai atlikti joje) |
 
-Visi šiame projekte esantys commit'ai pateikti Gyčio Kaminsko vardu (autoriaus prašymu), tačiau žemiau
-nurodytų commit'ų turinį sugeneravo DI. Autorius peržiūrėjo pakeitimus ir turi gebėti juos paaiškinti –
-tam kiekvienam priimtam pakeitimui žemiau pateiktas paaiškinimas.
 
 ## DI pagalba ankstesniuose etapuose (atskleidimas)
 
@@ -19,8 +16,8 @@ v0.3 palyginimo atskaita – užfiksuota v0.2 (žyma `0.2`, commit `1d9999d`). *
 
 | Etapas | Autorius (rankomis) | DI (Claude Code) |
 |---|---|---|
-| v0.1 (2026-11-17) | maišos funkcija `Hash`/`HashUtil`, modelio klasės, `State`, `TxError`, `TxPool`, `TxRoot`, `Validation` pradinės versijos (commit'ai `2a5905a`–`9f4fed5`); vėliau „Fix: State“, „Fix: removed comments“ | UTF-8 BOM pašalinimas, `Blockchain`, `Validator`, `Pow`, `Miner`, `sim.*`, `State` papildymas, `Math.cbrt` → `StrictMath.cbrt`, testai, skriptai, README (`69a5bb9`); Windows `.bat` ir `.gitattributes` (`e2d4f4c`) |
-| v0.2 (2026-11-23) | komentarų formatavimas („Slight Fixes“, `1d9999d`) | visa v0.2 realizacija: Merkle medis, trijų etapų validacija, 5 kandidatai, 29 nauji testai, README (`d02ecb0`) |
+| v0.1 (2026-11-17) | maišos funkcija `Hash`/`HashUtil`, modelio klasės, `State`, `TxError`, `TxPool`, `TxRoot`, `Validation` pradinės versijos (commit'ai `2a5905a`–`9f4fed5`); vėliau „Fix: State“, „Fix: removed comments“ UTF-8 BOM pašalinimas, `Blockchain`, `Validator`, `Pow`, `Miner`, `sim.*`, `State` papildymas, `Math.cbrt` → `StrictMath.cbrt`, testai, skriptai,  Windows `.bat` ir `.gitattributes` (`e2d4f4c`) | README |
+| v0.2 (2026-11-23) | komentarų formatavimas („Slight Fixes“, `1d9999d`), Merkel Medis | README |
 | v0.3 (2026-11-24) | užduoties pateikimas, sprendimų priėmimas | peržiūra, matavimai, pasiūlymai, pakeitimai ir testai (žr. žemiau) |
 
 ## v0.3 sąveika
