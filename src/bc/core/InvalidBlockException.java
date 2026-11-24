@@ -17,6 +17,6 @@ public final class InvalidBlockException extends Exception {
 
     public BlockError error() { return error; }
 
-    /** Jei blokas atmestas dėl transakcijos – jos klaida, kitaip null. */
+    // Jei blokas atmestas dėl transakcijos – jos klaida, kitaip null.
     public TxError txError() { return txError; }
 }

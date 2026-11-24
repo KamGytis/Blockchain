@@ -6,7 +6,7 @@ import bc.model.Transaction;
 
 import java.util.List;
 
-/** Vienas kandidatas kitam blokui: fiksuotas turinys ir antraštė, kasimo būsena tarp biudžeto raundų. */
+// Vienas kandidatas kitam blokui: fiksuotas turinys ir antraštė, kasimo būsena tarp biudžeto raundų.
 public final class Candidate {
     private final int index;
     private final List<Transaction> txs;
@@ -24,7 +24,7 @@ public final class Candidate {
         this.nextNonce = template.nonce();
     }
 
-    /** Tęsia paiešką nuo dar netikrinto nonce, kol rasta / išnaudotas biudžetas (bandymai arba laikas). */
+    // Tęsia paiešką nuo dar netikrinto nonce, kol rasta / išnaudotas biudžetas (bandymai arba laikas).
     public void search(long budgetAttempts, long budgetNanos) {
         if (solution != null) return;
         rounds++;

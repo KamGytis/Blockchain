@@ -13,7 +13,7 @@ import java.util.Set;
 public final class Validation {
     private Validation() {}
 
-    /** Laukų formatas: 64 hex raktai ir ID, sequence >= 0. */
+    // Laukų formatas: 64 hex raktai ir ID, sequence >= 0.
     public static TxError checkFormat(Transaction tx) {
         if (tx == null || !HashUtil.isHash(tx.sender()) || !HashUtil.isHash(tx.receiver()) || !HashUtil.isHash(tx.id()))
             return TxError.BAD_FORMAT;
@@ -21,12 +21,12 @@ public final class Validation {
         return null;
     }
 
-    /** Teigiama sveikoji suma (long visada sveikasis). */
+    // Teigiama sveikoji suma (long visada sveikasis).
     public static TxError checkAmount(Transaction tx) {
         return tx.amount() > 0 ? null : TxError.NON_POSITIVE_AMOUNT;
     }
 
-    /** Abu dalyviai egzistuoja ir nesutampa. */
+    // Abu dalyviai egzistuoja ir nesutampa.
     public static TxError checkParticipants(Transaction tx, State state) {
         if (!state.hasAccount(tx.sender())) return TxError.UNKNOWN_SENDER;
         if (!state.hasAccount(tx.receiver())) return TxError.UNKNOWN_RECEIVER;
@@ -42,7 +42,7 @@ public final class Validation {
         return tx.hasValidId() ? null : TxError.BAD_ID;
     }
 
-    /** Nuo būsenos balansų nepriklausančios taisyklės (formatas, suma, dalyviai, ID). */
+    // Nuo būsenos balansų nepriklausančios taisyklės (formatas, suma, dalyviai, ID).
     public static TxError checkStatic(Transaction tx, State state) {
         TxError e = checkFormat(tx);
         if (e == null) e = checkAmount(tx);
@@ -51,7 +51,7 @@ public final class Validation {
         return e;
     }
 
-    /** v0.1 suderinamumui. */
+    // v0.1 suderinamumui.
     public static TxError checkStructure(Transaction tx, State state) {
         return checkStatic(tx, state);
     }

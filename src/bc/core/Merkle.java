@@ -33,7 +33,7 @@ public final class Merkle {
         return levels.isEmpty() ? EMPTY_ROOT : levels.get(levels.size() - 1).get(0);
     }
 
-    /** Visi medžio lygiai nuo lapų iki šaknies (testams ir aiškinimui). Tuščiam sąrašui – tuščias. */
+    // Visi medžio lygiai nuo lapų iki šaknies (testams ir aiškinimui). Tuščiam sąrašui – tuščias.
     public static List<List<String>> levels(List<String> ids) {
         List<List<String>> levels = new ArrayList<>();
         if (ids.isEmpty()) return levels;

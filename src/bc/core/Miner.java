@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
-/** Vieno kasėjo režimas (v0.1): vienas kandidatas, kasamas be biudžeto ribos. */
+// Vieno kasėjo režimas (v0.1): vienas kandidatas, kasamas be biudžeto ribos.
 public final class Miner {
     private Miner() {}
 

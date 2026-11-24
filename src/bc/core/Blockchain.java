@@ -45,9 +45,9 @@ public final class Blockchain {
         this.maxTx = maxTx;
     }
 
-    // ---------- 3 etapas: atskiros patikros procedūros ----------
+    //  3 etapas: atskiros patikros procedūros
 
-    /** Antraštė: versija, prev_hash, sudėtingumas (kandidatas negali jo sumažinti), PoW pagal GRANDINĖS sudėtingumą. */
+    // Antraštė: versija, prev_hash, sudėtingumas (kandidatas negali jo sumažinti), PoW pagal GRANDINĖS sudėtingumą.
     public void checkHeader(BlockHeader h) throws InvalidBlockException {
         if (h.version() != VERSION) throw new InvalidBlockException(BlockError.UNSUPPORTED_VERSION, "version=" + h.version());
         if (!h.prevHash().equals(tipHash())) throw new InvalidBlockException(BlockError.BAD_PREV_HASH, h.prevHash());
@@ -58,7 +58,7 @@ public final class Blockchain {
         if (!Pow.meets(h, difficulty)) throw new InvalidBlockException(BlockError.BAD_POW, h.hash());
     }
 
-    /** Turinys: leidžiamas transakcijų skaičius ir Merkle šaknis. */
+    // Turinys: leidžiamas transakcijų skaičius ir Merkle šaknis. */
     public void checkBody(Block block) throws InvalidBlockException {
         List<Transaction> txs = block.transactions();
         if (txs.isEmpty()) throw new InvalidBlockException(BlockError.EMPTY, null);
@@ -89,7 +89,7 @@ public final class Blockchain {
         return work;
     }
 
-    /** Pilna patikra be jokių pakeitimų. Grąžina būseną, kuri būtų po bloko. */
+    // Pilna patikra be jokių pakeitimų. Grąžina būseną, kuri būtų po bloko.
     public State validate(Block block) throws InvalidBlockException {
         checkHeader(block.header());
         checkBody(block);
@@ -100,7 +100,7 @@ public final class Blockchain {
         addBlock(block, null);
     }
 
-    /** Patikrina ir, tik jei viskas tinka, vienu veiksmu prijungia bloką ir pašalina jo transakcijas iš fondo. */
+    // Patikrina ir, tik jei viskas tinka, vienu veiksmu prijungia bloką ir pašalina jo transakcijas iš fondo.
     public void addBlock(Block block, TxPool pool) throws InvalidBlockException {
         State next = validate(block);
         Set<String> ids = new LinkedHashSet<>();

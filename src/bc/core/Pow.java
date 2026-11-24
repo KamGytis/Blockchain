@@ -8,10 +8,10 @@ public final class Pow {
 
     public record Result(BlockHeader header, String hash, long attempts, long nanos) {}
 
-    /** Ribotos paieškos rezultatas: solution == null, jei per biudžetą sprendimo nerasta. */
+    // Ribotos paieškos rezultatas: solution == null, jei per biudžetą sprendimo nerasta.
     public record Search(BlockHeader solution, long attempts, long nanos, long nextNonce) {}
 
-    /** Ar antraštė tenkina JOS PAČIOS deklaruotą sudėtingumą (maiša perskaičiuojama). */
+    // Ar antraštė tenkina JOS PAČIOS deklaruotą sudėtingumą (maiša perskaičiuojama).
     public static boolean isValid(BlockHeader h) {
         return meets(h, h.difficulty());
     }
@@ -45,7 +45,7 @@ public final class Pow {
         return new Search(null, attempts, System.nanoTime() - start, nonce);
     }
 
-    /** Neribota paieška nuo template.nonce() (v0.1 elgsena). */
+    // Neribota paieška nuo template.nonce() (v0.1 elgsena).
     public static Result mine(BlockHeader template) {
         Search s = search(template, template.nonce(), Long.MAX_VALUE, Long.MAX_VALUE);
         return new Result(s.solution(), s.solution().hash(), s.attempts(), s.nanos());

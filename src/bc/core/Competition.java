@@ -65,7 +65,7 @@ public final class Competition {
         return new Result(candidates, null, budget.maxRounds(), attemptsBudget / 2, Map.of());
     }
 
-    /** Patogus apjungimas: sudaro kandidatus, juos kasa, grąžina rezultatą (permanentErrors – atmestinos tx). */
+    // Patogus apjungimas: sudaro kandidatus, juos kasa, grąžina rezultatą (permanentErrors – atmestinos tx).
     public static Result buildAndRun(Blockchain chain, TxPool pool, int count, int maxTx, Random rng, long timestamp,
                                      Budget budget) {
         Map<Transaction, TxError> perm = new LinkedHashMap<>();
