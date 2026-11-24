@@ -15,6 +15,7 @@ public final class TxPool {
     private final List<Rejection> rejected = new ArrayList<>();
 
     public TxError submit(Transaction tx, Blockchain chain) {
+        if (tx == null) return TxError.BAD_FORMAT; // v0.3: null neįrašomas į atmestųjų sąrašą (ataskaita mestų NPE)
         TxError e = Validator.admission(tx, chain, this);
         if (e != null) {
             rejected.add(new Rejection(tx, e));

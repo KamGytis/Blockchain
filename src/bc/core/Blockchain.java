@@ -49,6 +49,10 @@ public final class Blockchain {
 
     // Antraštė: versija, prev_hash, sudėtingumas (kandidatas negali jo sumažinti), PoW pagal GRANDINĖS sudėtingumą.
     public void checkHeader(BlockHeader h) throws InvalidBlockException {
+        // v0.3: netinkamo formato antraštė atmetama su priežastimi, o ne NullPointerException
+        if (h == null) throw new InvalidBlockException(BlockError.BAD_FORMAT, "nera antrastes");
+        if (!HashUtil.isHash(h.prevHash())) throw new InvalidBlockException(BlockError.BAD_FORMAT, "prev_hash ne 64 hex");
+        if (!HashUtil.isHash(h.txRoot())) throw new InvalidBlockException(BlockError.BAD_FORMAT, "tx_root ne 64 hex");
         if (h.version() != VERSION) throw new InvalidBlockException(BlockError.UNSUPPORTED_VERSION, "version=" + h.version());
         if (!h.prevHash().equals(tipHash())) throw new InvalidBlockException(BlockError.BAD_PREV_HASH, h.prevHash());
         if (h.difficulty() < difficulty)
@@ -91,6 +95,7 @@ public final class Blockchain {
 
     // Pilna patikra be jokių pakeitimų. Grąžina būseną, kuri būtų po bloko.
     public State validate(Block block) throws InvalidBlockException {
+        if (block == null) throw new InvalidBlockException(BlockError.BAD_FORMAT, "nera bloko");
         checkHeader(block.header());
         checkBody(block);
         return applyTransactions(block.transactions());

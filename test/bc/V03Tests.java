@@ -17,6 +17,8 @@ final class V03Tests {
         T.test("S1: toHex lentele = String.format(\"%08x\") 1 000 000 atsitiktiniu zodziu", V03Tests::toHexEquivalent);
         T.test("S2: PrefixHasher (midstate) = pilna maisa, 0..200 B prefiksai ir 0..80 B priesagos", V03Tests::midstateEquivalent);
         T.test("S2: leadingHexZeros = nuliu skaicius hex eiluteje", V03Tests::leadingZerosEquivalent);
+        T.test("S4: netinkamo formato antraste / null blokas atmetami su priezastimi, ne NPE", V03Tests::malformedBlocks);
+        T.test("S4: pool.submit(null) -> BAD_FORMAT, atmestuju sarase null nera", V03Tests::nullTx);
         T.test("S2: Pow.search = v0.2 algoritmas (nonce, bandymai, nextNonce; skaitmenu ribos, neigiami)", V03Tests::searchEquivalent);
     }
 
@@ -31,6 +33,37 @@ final class V03Tests {
             if (!fast.equals(reference(w))) throw new AssertionError("skiriasi: " + fast + " vs " + reference(w));
         }
         T.check(HashUtil.isHash(HashAccess.toHex(w)), "64 hex");
+    }
+
+    static void malformedBlocks() throws Exception {
+        bc.core.Blockchain chain = new bc.core.Blockchain(bc.core.State.fromUsers(java.util.List.of(
+                T.user("A", T.A, 100), T.user("B", T.B, 0))), 1);
+        java.util.List<bc.model.Transaction> txs = java.util.List.of(bc.model.Transaction.create(T.A, T.B, 10, 0));
+        BlockHeader g = bc.core.Miner.mine(chain, txs, 0).block().header();
+        java.util.Map<String, Long> before = chain.state().snapshot();
+        String[] bad = {null, "", "ABC", g.prevHash().toUpperCase().replace('0', 'G'), g.prevHash() + "0"};
+        for (String v : bad) {
+            T.expectReject(chain, new bc.model.Block(new BlockHeader(v, 0, 2, g.txRoot(), g.nonce(), 1), txs), bc.core.BlockError.BAD_FORMAT, null);
+            T.expectReject(chain, new bc.model.Block(new BlockHeader(g.prevHash(), 0, 2, v, g.nonce(), 1), txs), bc.core.BlockError.BAD_FORMAT, null);
+        }
+        T.expectReject(chain, null, bc.core.BlockError.BAD_FORMAT, null);
+        try {
+            chain.validate(new bc.model.Block(null, txs));
+            throw new AssertionError("turejo buti atmesta");
+        } catch (bc.core.InvalidBlockException e) {
+            T.eq(bc.core.BlockError.BAD_FORMAT, e.error(), "be antrastes");
+        }
+        T.eq(before, chain.state().snapshot(), "busena nepakito");
+        T.eq(0, chain.height(), "aukstis nepakito");
+    }
+
+    static void nullTx() {
+        bc.core.Blockchain chain = new bc.core.Blockchain(bc.core.State.fromUsers(java.util.List.of(
+                T.user("A", T.A, 100), T.user("B", T.B, 0))), 1);
+        bc.core.TxPool pool = new bc.core.TxPool();
+        T.eq(bc.core.TxError.BAD_FORMAT, pool.submit(null, chain), "priezastis");
+        T.eq(0, pool.rejected().size(), "null neirasytas");
+        T.eq(0, pool.size(), "fondas tuscias");
     }
 
     static void midstateEquivalent() {

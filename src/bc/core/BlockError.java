@@ -1,6 +1,7 @@
 package bc.core;
 
 public enum BlockError {
+    BAD_FORMAT("netinkamas bloko ar antrastes formatas"),
     UNSUPPORTED_VERSION("nepalaikoma formato versija"),
     BAD_PREV_HASH("prev_hash nesutampa su paskutiniu bloku"),
     LOWERED_DIFFICULTY("kandidatas sumazino reikalaujama sudetinguma"),
