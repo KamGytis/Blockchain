@@ -126,11 +126,19 @@ public class Hash {
                 | (p[off + 3] & 0xFF);
     }
 
+    private static final char[] HEX = "0123456789abcdef".toCharArray();
+
+    // v0.3: lentelė vietoj String.format("%08x") - tas pats rezultatas (8 mažosios hex raidės, su pradiniais
+    // nuliais), bet be formatavimo eilutės analizės kiekvienam žodžiui. Lygiavertiškumas tikrinamas V03Tests.
     static String toHex(int[] h) {
-        StringBuilder sb = new StringBuilder();
+        char[] out = new char[h.length * 8];
         for (int i = 0; i < h.length; i++) {
-            sb.append(String.format("%08x", h[i]));
+            int v = h[i];
+            for (int j = 7; j >= 0; j--) {
+                out[i * 8 + j] = HEX[v & 0xF];
+                v >>>= 4;
+            }
         }
-        return sb.toString();
+        return new String(out);
     }
 }

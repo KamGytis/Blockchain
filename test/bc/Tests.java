@@ -11,6 +11,8 @@ public final class Tests {
         ValidationTests.all();
         T.section("v0.2: penki kandidatai");
         CompetitionTests.all();
+        T.section("v0.3: optimizaciju lygiavertiskumas");
+        V03Tests.all();
         T.section("bendras teisingumo rinkinys (5 skyrius; tas pats v0.2 ir v0.3)");
         CorrectnessSuite.all();
 
